@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trie Autocomplete Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-wrapper {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 18px 50px 18px 20px;
+            border: none;
+            font-size: 16px;
+            outline: none;
+            background: transparent;
+        }
+
+        .search-input::placeholder {
+            color: #9ca3af;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            color: #9ca3af;
+        }
+
+        .spinner {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        .spinner.visible {
+            display: block;
+        }
+
+        .search-icon.hidden {
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: translateY(-50%) rotate(360deg);
+            }
+        }
+
+        .dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .dropdown.visible {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 14px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background-color 0.15s ease;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.selected {
+            background-color: #f9fafb;
+        }
+
+        .suggestion-item.selected {
+            background-color: #eff6ff;
+        }
+
+        .suggestion-text {
+            font-size: 15px;
+            color: #374151;
+        }
+
+        .suggestion-text .highlight {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .suggestion-freq {
+            font-size: 12px;
+            color: #9ca3af;
+            background: #f3f4f6;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+
+        .empty-state {
+            padding: 40px 20px;
+            text-align: center;
+            color: #9ca3af;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .stats-panel {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-around;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .query-time {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            min-height: 18px;
+        }
+
+        .keyboard-hint {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .keyboard-hint kbd {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .add-word-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .add-word-section h3 {
+            font-size: 16px;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .add-word-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .add-word-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .add-word-input:focus {
+            border-color: #667eea;
+        }
+
+        .add-word-btn {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .add-word-btn:hover {
+            background: #5a67d8;
+        }
+
+        .message {
+            margin-top: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d1fae5;
+            color: #065f46;
+            display: block;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔍 Autocomplete Search</h1>
+        <p class="subtitle">Trie-powered instant suggestions</p>
+
+        <div class="search-container">
+            <div class="search-wrapper">
+                <input type="text" class="search-input" id="searchInput" placeholder="Type to search..."
+                    autocomplete="off">
+                <svg class="search-icon" id="searchIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <div class="spinner" id="spinner"></div>
+            </div>
+            <div class="dropdown" id="dropdown"></div>
+        </div>
+
+        <div class="query-time" id="queryTime"></div>
+
+        <div class="stats-panel">
+            <div class="stat-item">
+                <span class="stat-value" id="totalWords">0</span>
+                <span class="stat-label">Words</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="totalNodes">0</span>
+                <span class="stat-label">Nodes</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value" id="trieDepth">0</span>
+                <span class="stat-label">Depth</span>
+            </div>
+        </div>
+
+        <div class="add-word-section">
+            <h3>Add New Word</h3>
+            <div class="add-word-form">
+                <input type="text" class="add-word-input" id="newWordInput" placeholder="Enter a word...">
+                <button class="add-word-btn" id="addWordBtn">Add</button>
+            </div>
+            <div class="message" id="message"></div>
+        </div>
+
+        <p class="keyboard-hint">
+            Use <kbd>↑</kbd> <kbd>↓</kbd> to navigate & <kbd>Enter</kbd> to select
+        </p>
+    </div>
+
+    <script>
+        const API_BASE_URL = '';
+
+        const searchInput = document.getElementById('searchInput');
+        const dropdown = document.getElementById('dropdown');
+        const spinner = document.getElementById('spinner');
+        const searchIcon = document.getElementById('searchIcon');
+        const queryTimeEl = document.getElementById('queryTime');
+        const newWordInput = document.getElementById('newWordInput');
+        const addWordBtn = document.getElementById('addWordBtn');
+        const messageEl = document.getElementById('message');
+
+        const totalWordsEl = document.getElementById('totalWords');
+        const totalNodesEl = document.getElementById('totalNodes');
+        const trieDepthEl = document.getElementById('trieDepth');
+
+        let suggestions = [];
+        let selectedIndex = -1;
+        let debounceTimer = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            searchInput.focus();
+        });
+
+        searchInput.addEventListener('input', handleInput);
+        searchInput.addEventListener('keydown', handleKeydown);
+        searchInput.addEventListener('blur', () => setTimeout(() => hideDropdown(), 200));
+        searchInput.addEventListener('focus', () => { if (suggestions.length > 0) showDropdown(); });
+
+        addWordBtn.addEventListener('click', addNewWord);
+        newWordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addNewWord(); });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-container')) hideDropdown();
+        });
+
+        function handleInput(e) {
+            const rawValue = e.target.value.trimStart();
+            clearTimeout(debounceTimer);
+            if (!rawValue) {
+                suggestions = [];
+                selectedIndex = -1;
+                hideDropdown();
+                return;
+            }
+            const parts = rawValue.trimEnd().split(/\s+/);
+            const prefix = parts[parts.length - 1];
+            const context = parts.length > 1 ? parts[parts.length - 2] : '';
+
+            debounceTimer = setTimeout(() => fetchSuggestions(prefix, context), 150);
+        }
+
+        function handleKeydown(e) {
+            if (!suggestions.length && e.key !== 'Enter') return;
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1);
+                    updateSelection();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, -1);
+                    updateSelection();
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    if (selectedIndex >= 0 && suggestions[selectedIndex]) {
+                        selectSuggestion(suggestions[selectedIndex].word);
+                    } else if (searchInput.value.trimStart()) {
+                        const parts = searchInput.value.trim().split(/\s+/).pop();
+                        const lastWord = parts[parts.length - 1];
+                        if (lastWord) selectSuggestion(lastWord);
+                    }
+                    break;
+                case 'Escape':
+                    hideDropdown();
+                    searchInput.blur();
+                    break;
+            }
+        }
+
+        async function fetchSuggestions(prefix, context = '') {
+            showLoading();
+            try {
+                const startTime = performance.now();
+                const response = await fetch(`${API_BASE_URL}/autocomplete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prefix, context, top_k: 10 })
+                });
+                if (!response.ok) throw new Error('API Error');
+                const data = await response.json();
+                suggestions = data.suggestions || [];
+                const totalTime = (performance.now() - startTime).toFixed(2);
+                queryTimeEl.textContent = `Server: ${data.time_ms}ms | Total: ${totalTime}ms | ${data.count} results`;
+                selectedIndex = -1;
+                if (suggestions.length > 0) {
+                    renderSuggestions(prefix);
+                    showDropdown();
+                } else {
+                    renderEmptyState();
+                    showDropdown();
+                }
+            } catch (error) {
+                queryTimeEl.textContent = 'Error connecting to server. Is the backend running?';
+                suggestions = [];
+                hideDropdown();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderSuggestions(prefix) {
+            const html = suggestions.map((item, index) => {
+                const highlightedWord = highlightPrefix(item.word, prefix);
+                return `
+                    <div class="suggestion-item" data-index="${index}" data-word="${escapeHtml(item.word)}">
+                        <span class="suggestion-text">${highlightedWord}</span>
+                        <span class="suggestion-freq">${formatNumber(item.frequency)}</span>
+                    </div>
+                `;
+            }).join('');
+            dropdown.innerHTML = html;
+            dropdown.querySelectorAll('.suggestion-item').forEach(item => {
+                item.addEventListener('click', () => selectSuggestion(item.dataset.word));
+                item.addEventListener('mouseenter', () => {
+                    selectedIndex = parseInt(item.dataset.index);
+                    updateSelection();
+                });
+            });
+        }
+
+        function renderEmptyState() {
+            dropdown.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔍</div>
+                    <div>No suggestions found for "${escapeHtml(searchInput.value.trim())}"</div>
+                </div>
+            `;
+        }
+
+        function highlightPrefix(word, prefix) {
+            if (!prefix) return escapeHtml(word);
+            const lowerWord = word.toLowerCase();
+            const lowerPrefix = prefix.toLowerCase();
+            if (lowerWord.startsWith(lowerPrefix)) {
+                const matched = word.slice(0, prefix.length);
+                const rest = word.slice(prefix.length);
+                return `<span class="highlight">${escapeHtml(matched)}</span>${escapeHtml(rest)}`;
+            }
+            return escapeHtml(word);
+        }
+
+        function updateSelection() {
+            const items = dropdown.querySelectorAll('.suggestion-item');
+            items.forEach((item, index) => item.classList.toggle('selected', index === selectedIndex));
+            if (selectedIndex >= 0 && items[selectedIndex]) {
+                items[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        async function selectSuggestion(word) {
+            const rawValue = searchInput.value.trimStart();
+            const parts = rawValue.split(/\s+/);
+            const context = parts.length > 1 ? parts[parts.length - 2] : '';
+
+            parts[parts.length - 1] = word;
+            searchInput.value = parts.join(' ') + ' ';
+            searchInput.focus();
+            hideDropdown();
+            try {
+                await fetch(`${API_BASE_URL}/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word, context })
+                });
+            } catch (error) { }
+            loadStats();
+        }
+
+        async function addNewWord() {
+            const word = newWordInput.value.trim().toLowerCase();
+            if (!word) { showMessage('Please enter a word', 'error'); return; }
+            if (!/^[a-z]+$/.test(word)) { showMessage('Please enter only letters (a-z)', 'error'); return; }
+            try {
+                const response = await fetch(`${API_BASE_URL}/insert`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word, frequency: 100 })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`"${word}" added successfully!`, 'success');
+                    newWordInput.value = '';
+                    loadStats();
+                } else {
+                    showMessage('Failed to add word', 'error');
+                }
+            } catch (error) {
+                showMessage('Error connecting to server', 'error');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/stats`);
+                const data = await response.json();
+                totalWordsEl.textContent = formatNumber(data.total_words);
+                totalNodesEl.textContent = formatNumber(data.total_nodes);
+                trieDepthEl.textContent = data.trie_depth;
+            } catch (error) { }
+        }
+
+        function showDropdown() { dropdown.classList.add('visible'); }
+        function hideDropdown() { dropdown.classList.remove('visible'); }
+        function showLoading() { spinner.classList.add('visible'); searchIcon.classList.add('hidden'); }
+        function hideLoading() { spinner.classList.remove('visible'); searchIcon.classList.remove('hidden'); }
+        function showMessage(text, type) {
+            messageEl.textContent = text;
+            messageEl.className = `message ${type}`;
+            setTimeout(() => { messageEl.className = 'message'; }, 3000);
+        }
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+            return num.toString();
+        }
+    </script>
+</body>
+
+</html>
